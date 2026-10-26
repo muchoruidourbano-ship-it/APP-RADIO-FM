@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parrilla FM</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d1d1b;--mut:#6b6a66;--bd:#e2e0da;--ac:#d4380d;--acx:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161615;--card:#212120;--tx:#f0efeb;--mut:#a09f9a;--bd:#34332f;--ac:#ff6a3d;--acx:#161615;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#161615;--card:#212120;--tx:#f0efeb;--mut:#a09f9a;--bd:#34332f;--ac:#ff6a3d;--acx:#161615;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,sans-serif}
+.w{max-width:980px;margin:0 auto;padding:12px}
+header{display:flex;align-items:center;gap:12px;padding:6px 0 10px}
+header h1{font-size:19px;margin:0}header small{color:var(--mut)}
+nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px}
+nav button{white-space:nowrap;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:20px;font:inherit;cursor:pointer}
+nav button.on{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
+.item{display:flex;gap:12px;align-items:flex-start}
+.item>div:last-child{flex:1;min-width:0}
+.av{border-radius:50%;object-fit:cover;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.av.ph{background:var(--bd);color:var(--mut);font-weight:600}
+img.lg{border-radius:10px}
+.b{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:8px;font:inherit;cursor:pointer}
+.b.pri{background:var(--ac);color:var(--acx);border-color:var(--ac)}.b.dng{color:#c0392b}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>label{flex:1;min-width:120px}.row.end{justify-content:flex-end;margin-top:14px}
+label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
+input[type=text],input[type=number],input[type=date],input[type=month],select,textarea{width:100%;box-sizing:border-box;margin-top:4px;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:80px}
+.lbl{font-size:13px;color:var(--mut);margin-top:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.chip{display:inline-flex;align-items:center;gap:5px;margin:0;padding:6px 10px;border:1px solid var(--bd);border-radius:16px;color:var(--tx);font-size:14px}
+.chip input{margin:0}
+.badge{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--bd);color:var(--mut)}
+small,.mut{color:var(--mut)}
+.gw{overflow-x:auto;border:1px solid var(--bd);border-radius:12px;background:var(--card)}
+table.g{border-collapse:collapse;min-width:760px;width:100%;table-layout:fixed}
+.g th{font-size:12px;padding:8px 4px;border-bottom:1px solid var(--bd);color:var(--mut)}
+.g td{border:1px solid var(--bd);height:36px;padding:0;font-size:12px;vertical-align:top}
+.g td.h{width:52px;text-align:center;color:var(--mut);vertical-align:middle;font-size:11px}
+.g td.s{color:#fff;padding:4px 6px;cursor:pointer;overflow:hidden;line-height:1.25}
+.g td.s span{display:block;opacity:.85;font-size:11px}
+.g td.e{cursor:pointer}.g td.e:hover{background:var(--bd)}
+.bar{height:8px;border-radius:4px;background:var(--bd);margin-top:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.up{color:#2e9d57}.dn{color:#c0392b}
+dialog{border:1px solid var(--bd);border-radius:14px;background:var(--card);color:var(--tx);width:min(480px,94vw);max-height:90vh;padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+h3{margin:0 0 4px}
+</style></head><body>
+<div class="w"><div id="app"></div></div>
+<dialog id="dlg"></dialog>
+<script>
+const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+let S={station:{name:'Mi emisora FM',freq:'',logo:''},people:[],programs:[],slots:[],logs:[]};
+try{const r=localStorage.getItem('fmapp');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem('fmapp',JSON.stringify(S))}catch(e){alert('No se pudo guardar (almacenamiento lleno o bloqueado). Descarga un respaldo en la pestaña Estación.')}};
+let tab='parrilla',month=today().slice(0,7),tmp='';
+const P=id=>S.programs.find(p=>p.id==id),H=id=>S.people.find(p=>p.id==id);
+const col=id=>{let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return `hsl(${h} 50% 38%)`};
+const av=(src,n,sz=44)=>src?`<img class="av" style="width:${sz}px;height:${sz}px" src="${src}" alt="">`:`<span class="av ph" style="width:${sz}px;height:${sz}px">${esc((n||'?')[0]).toUpperCase()}</span>`;
+const lg=(src,n,sz=56)=>src?`<img class="lg av" style="width:${sz}px;height:${sz}px;border-radius:10px" src="${src}" alt="">`:`<span class="av ph" style="width:${sz}px;height:${sz}px;border-radius:10px">${esc((n||'?')[0]).toUpperCase()}</span>`;
+function pickImg(cb,max=256){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.82))};im.src=r.result};r.readAsDataURL(f)};i.click()}
+const dlg=document.getElementById('dlg');
+const openDlg=h=>{dlg.innerHTML=h;dlg.showModal()};
+const hourOpts=(a,b,sel)=>{let o='';for(let i=a;i<=b;i++)o+=`<option value="${i}" ${i==sel?'selected':''}>${pad(i)}:00</option>`;return o};
+const val=id=>document.getElementById(id).value;
+const checked=n=>[...document.querySelectorAll(`input[name=${n}]:checked`)].map(x=>x.value);
+function setTab(t){tab=t;render()}
+
+function render(){
+ const st=S.station,tabs=[['parrilla','Parrilla'],['programas','Programas'],['equipo','Equipo'],['registro','Registro'],['eval','Evaluación'],['estacion','Estación']];
+ document.getElementById('app').innerHTML=`<header>${lg(st.logo,st.name,48)}<div><h1>${esc(st.name)}</h1><small>${esc(st.freq)||'Organizador de programación'}</small></div></header>
+ <nav>${tabs.map(([k,n])=>`<button class="${tab==k?'on':''}" onclick="setTab('${k}')">${n}</button>`).join('')}</nav>`+({parrilla:vGrid,programas:vProgs,equipo:vTeam,registro:vLog,eval:vEval,estacion:vStation})[tab]();
+}
+
+/* PARRILLA */
+function vGrid(){
+ const skip=Array(7).fill(0);let rows='';
+ for(let h=0;h<24;h++){rows+=`<tr><td class="h">${pad(h)}:00</td>`;
+  for(let d=0;d<7;d++){
+   if(skip[d]>0){skip[d]--;continue}
+   const s=S.slots.find(x=>x.day==d&&x.start==h);
+   if(s){const p=P(s.programId),n=s.end-s.start;skip[d]=n-1;
+    const hs=(s.hosts||[]).map(i=>H(i)?.name).filter(Boolean).join(', '),op=H(s.operator)?.name;
+    rows+=`<td class="s" rowspan="${n}" style="background:${col(s.programId)}" onclick="slotDlg('${s.id}')"><b>${esc(p?.name||'?')}</b>${hs?`<span>🎙 ${esc(hs)}</span>`:''}${op?`<span>🎚 ${esc(op)}</span>`:''}</td>`}
+   else rows+=`<td class="e" onclick="slotDlg(null,${d},${h})"></td>`}
+  rows+='</tr>'}
+ return `<p class="mut" style="margin:4px 0 8px">Toca una celda vacía para programar; toca un bloque para editarlo.</p><div class="gw"><table class="g"><thead><tr><th></th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function slotDlg(id,d=0,h=0){
+ if(!S.programs.length){alert('Primero crea un programa en la pestaña Programas.');return}
+ const s=id?S.slots.find(x=>x.id==id):null,hosts=S.people.filter(p=>p.role=='locutor'),ops=S.people.filter(p=>p.role=='operador');
+ openDlg(`<h3>${s?'Editar':'Nuevo'} bloque</h3>
+ <label>Programa<select id="f_p">${S.programs.map(p=>`<option value="${p.id}" ${s&&s.programId==p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+ <div class="row"><label>Desde<select id="f_s">${hourOpts(0,23,s?s.start:h)}</select></label><label>Hasta<select id="f_e">${hourOpts(1,24,s?s.end:h+1)}</select></label></div>
+ <div class="lbl">Días</div><div class="chips">${DAYS.map((n,i)=>`<label class="chip"><input type="checkbox" name="f_d" value="${i}" ${(s?s.day==i:d==i)?'checked':''}>${n.slice(0,3)}</label>`).join('')}</div>
+ <div class="lbl">Locutores</div><div class="chips">${hosts.length?hosts.map(p=>`<label class="chip"><input type="checkbox" name="f_h" value="${p.id}" ${s&&(s.hosts||[]).includes(p.id)?'checked':''}>${esc(p.name)}</label>`).join(''):'<small>Agrega locutores en la pestaña Equipo</small>'}</div>
+ <label>Operador<select id="f_o"><option value="">— sin asignar —</option>${ops.map(p=>`<option value="${p.id}" ${s&&s.operator==p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>
+ <div class="row end">${s?`<button class="b dng" onclick="delSlot('${s.id}')">Eliminar</button>`:''}<button class="b" onclick="dlg.close()">Cancelar</button><button class="b pri" onclick="saveSlot('${s?s.id:''}')">Guardar</button></div>`)}
+function saveSlot(id){
+ const s=+val('f_s'),e=+val('f_e'),days=checked('f_d').map(Number);
+ if(e<=s){alert('La hora final debe ser mayor que la inicial.');return}
+ if(!days.length){alert('Elige al menos un día.');return}
+ for(const d of days){const o=S.slots.find(x=>x.id!=id&&x.day==d&&s<x.end&&e>x.start);if(o){alert(`Se cruza con «${P(o.programId)?.name}» el ${DAYS[d]} (${pad(o.start)}:00–${pad(o.end)}:00).`);return}}
+ S.slots=S.slots.filter(x=>x.id!=id);
+ days.forEach(d=>S.slots.push({id:uid(),programId:val('f_p'),day:d,start:s,end:e,hosts:checked('f_h'),operator:val('f_o')}));
+ save();dlg.close();render()}
+function delSlot(id){S.slots=S.slots.filter(x=>x.id!=id);save();dlg.close();render()}
+
+/* PROGRAMAS */
+function vProgs(){return `<button class="b pri" onclick="progDlg()">+ Programa</button>`+(S.programs.map(p=>{
+ const sl=S.slots.filter(s=>s.programId==p.id).sort((a,b)=>a.day-b.day||a.start-b.start);
+ return `<div class="card item">${lg(p.logo,p.name)}<div><b>${esc(p.name)}</b><div class="mut">${esc(p.desc)}</div><small>${sl.length?sl.map(s=>`${DAYS[s.day].slice(0,3)} ${pad(s.start)}–${pad(s.end)}h`).join(' · '):'Sin horario asignado'}</small></div><button class="b" onclick="progDlg('${p.id}')">Editar</button></div>`}).join('')||'<p class="mut">Aún no hay programas.</p>')}
+function progDlg(id){const p=id?P(id):{};tmp=p.logo||'';
+ openDlg(`<h3>${id?'Editar':'Nuevo'} programa</h3><label>Nombre<input type="text" id="f_n" value="${esc(p.name)}"></label><label>Descripción<textarea id="f_d">${esc(p.desc)}</textarea></label>
+ <div class="item" style="margin-top:12px"><span id="pv">${lg(tmp,p.name||'?')}</span><button class="b" onclick="pickImg(d=>{tmp=d;pv.innerHTML=lg(d,'?')})">Subir logo</button></div>
+ <div class="row end">${id?`<button class="b dng" onclick="delProg('${id}')">Eliminar</button>`:''}<button class="b" onclick="dlg.close()">Cancelar</button><button class="b pri" onclick="saveProg('${id||''}')">Guardar</button></div>`)}
+function saveProg(id){const n=val('f_n').trim();if(!n){alert('Escribe un nombre.');return}
+ if(id){Object.assign(P(id),{name:n,desc:val('f_d'),logo:tmp})}else S.programs.push({id:uid(),name:n,desc:val('f_d'),logo:tmp});
+ save();dlg.close();render()}
+function delProg(id){if(!confirm('Se eliminarán también su horario y su registro de emisiones. ¿Continuar?'))return;
+ S.programs=S.programs.filter(p=>p.id!=id);S.slots=S.slots.filter(s=>s.programId!=id);S.logs=S.logs.filter(l=>l.programId!=id);save();dlg.close();render()}
+
+/* EQUIPO */
+function vTeam(){return `<button class="b pri" onclick="perDlg()">+ Persona</button>`+(S.people.map(p=>`<div class="card item">${av(p.photo,p.name,56)}<div><b>${esc(p.name)}</b> <span class="badge">${p.role=='locutor'?'Locutor/a':'Operador/a'}</span><div class="mut" style="white-space:pre-wrap">${esc(p.bio)||'Sin biografía'}</div></div><button class="b" onclick="perDlg('${p.id}')">Editar</button></div>`).join('')||'<p class="mut">Agrega locutores y operadores.</p>')}
+function perDlg(id){const p=id?H(id):{role:'locutor'};tmp=p.photo||'';
+ openDlg(`<h3>${id?'Editar':'Nueva'} persona</h3><label>Nombre<input type="text" id="f_n" value="${esc(p.name)}"></label>
+ <label>Rol<select id="f_r"><option value="locutor" ${p.role=='locutor'?'selected':''}>Locutor/a (conductor)</option><option value="operador" ${p.role=='operador'?'selected':''}>Operador/a</option></select></label>
+ <label>Biografía<textarea id="f_b">${esc(p.bio)}</textarea></label>
+ <div class="item" style="margin-top:12px"><span id="pv">${av(tmp,p.name||'?',56)}</span><button class="b" onclick="pickImg(d=>{tmp=d;pv.innerHTML=av(d,'?',56)})">Subir foto</button></div>
+ <div class="row end">${id?`<button class="b dng" onclick="delPer('${id}')">Eliminar</button>`:''}<button class="b" onclick="dlg.close()">Cancelar</button><button class="b pri" onclick="savePer('${id||''}')">Guardar</button></div>`)}
+function savePer(id){const n=val('f_n').trim();if(!n){alert('Escribe un nombre.');return}
+ const d={name:n,role:val('f_r'),bio:val('f_b'),photo:tmp};
+ if(id)Object.assign(H(id),d);else S.people.push({id:uid(),...d});save();dlg.close();render()}
+function delPer(id){if(!confirm('¿Eliminar a esta persona? Se quitará de los bloques asignados.'))return;
+ S.people=S.people.filter(p=>p.id!=id);S.slots.forEach(s=>{s.hosts=(s.hosts||[]).filter(h=>h!=id);if(s.operator==id)s.operator=''});save();dlg.close();render()}
+
+/* REGISTRO */
+function vLog(){
+ const ls=[...S.logs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60);
+ return `<div class="card"><b>Registrar programa emitido</b>
+ <label>Programa<select id="l_p">${S.programs.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+ <div class="row"><label>Fecha<input type="date" id="l_d" value="${today()}"></label><label>Likes<input type="number" id="l_l" min="0" value="0"></label><label>Comentarios en vivo<input type="number" id="l_c" min="0" value="0"></label></div>
+ <label>Notas (opcional)<input type="text" id="l_n"></label><div class="row end"><button class="b pri" onclick="addLog()">Guardar emisión</button></div></div>`+
+ (ls.map(l=>{const p=P(l.programId);return `<div class="card item">${lg(p?.logo,p?.name,40)}<div><b>${esc(p?.name)}</b> <small>${l.date}</small><div>👍 ${l.likes} · 💬 ${l.comments}</div>${l.note?`<small>${esc(l.note)}</small>`:''}</div><button class="b dng" onclick="delLog('${l.id}')">✕</button></div>`}).join('')||'<p class="mut">Sin emisiones registradas.</p>')}
+function addLog(){if(!S.programs.length){alert('Primero crea un programa.');return}
+ S.logs.push({id:uid(),programId:val('l_p'),date:val('l_d')||today(),likes:+val('l_l')||0,comments:+val('l_c')||0,note:val('l_n')});save();render()}
+function delLog(id){S.logs=S.logs.filter(l=>l.id!=id);save();render()}
+
+/* EVALUACIÓN */
+const prevM=m=>{let[y,n]=m.split('-').map(Number);n--;if(!n){y--;n=12}return y+'-'+pad(n)};
+function stats(pid,m){const l=S.logs.filter(x=>x.programId==pid&&x.date.startsWith(m)),n=l.length,lk=l.reduce((a,x)=>a+x.likes,0),cm=l.reduce((a,x)=>a+x.comments,0);return{n,lk,cm,avg:n?(lk+cm)/n:0}}
+function vEval(){
+ const rows=S.programs.map(p=>({p,c:stats(p.id,month),b:stats(p.id,prevM(month))})).sort((a,b)=>b.c.avg-a.c.avg),mx=Math.max(1,...rows.map(r=>r.c.avg));
+ return `<label style="margin-top:0">Mes a evaluar<input type="month" id="m" value="${month}" onchange="month=this.value;render()"></label>`+
+ (rows.map((r,i)=>{const d=r.b.avg?((r.c.avg-r.b.avg)/r.b.avg*100):null;
+  return `<div class="card"><div class="item">${lg(r.p.logo,r.p.name,40)}<div><b>${i+1}. ${esc(r.p.name)}</b><div class="mut">${r.c.n} emisiones · 👍 ${r.c.lk} · 💬 ${r.c.cm}</div><div>Promedio de interacción por emisión: <b>${r.c.avg.toFixed(1)}</b> ${d===null?'<small>(sin mes anterior)</small>':`<span class="${d>=0?'up':'dn'}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(0)}% vs mes anterior</span>`}</div></div></div><div class="bar"><i style="width:${r.c.avg/mx*100}%"></i></div></div>`}).join('')||'<p class="mut">Crea programas y registra emisiones para evaluar.</p>')}
+
+/* ESTACIÓN */
+function vStation(){const s=S.station;return `<div class="card"><label style="margin-top:0">Nombre de la emisora<input type="text" value="${esc(s.name)}" onchange="S.station.name=this.value;save();render()"></label>
+ <label>Frecuencia / eslogan<input type="text" value="${esc(s.freq)}" onchange="S.station.freq=this.value;save();render()"></label>
+ <div class="item" style="margin-top:12px">${lg(s.logo,s.name,64)}<button class="b" onclick="pickImg(d=>{S.station.logo=d;save();render()})">Subir imagen de la estación</button></div></div>
+ <div class="card"><b>Respaldo</b><p class="mut">Los datos se guardan en este navegador. Descarga un respaldo para no perderlos o llevarlos a otro equipo.</p>
+ <div class="row"><button class="b" onclick="exp()">Descargar respaldo</button><button class="b" onclick="imp()">Restaurar respaldo</button></div></div>`}
+function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='parrilla-fm-respaldo.json';a.click()}
+function imp(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=()=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.programs)throw 0;S=Object.assign(S,d);save();render()}catch(e){alert('Archivo no válido.')}};r.readAsText(i.files[0])};i.click()}
+render();
+</script></body></html>

@@ -1,0 +1,4 @@
+1. Crea un repositorio nuevo en github.com y sube todo el contenido de esta carpeta (rama main).
+2. Entra a la pestana Actions: el flujo "Build APK" corre solo (2-5 min).
+3. Abre la ejecucion terminada, baja "FM-Sayko-apk" (zip) y dentro esta app-debug.apk.
+4. Pasalo al celular y abrelo (permite instalar apps de origenes desconocidos).
