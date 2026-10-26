@@ -48,6 +48,7 @@ h3{margin:0 0 4px}
 </style></head><body>
 <div class="w"><div id="app"></div></div>
 <dialog id="dlg"></dialog>
+<script src="jspdf.umd.min.js" onerror="var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';document.head.appendChild(s)"></script>
 <script>
 const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -88,7 +89,7 @@ function vGrid(){
     rows+=`<td class="s" rowspan="${n}" style="background:${col(s.programId)}" onclick="slotDlg('${s.id}')"><b>${esc(p?.name||'?')}</b>${hs?`<span>🎙 ${esc(hs)}</span>`:''}${op?`<span>🎚 ${esc(op)}</span>`:''}</td>`}
    else rows+=`<td class="e" onclick="slotDlg(null,${d},${h})"></td>`}
   rows+='</tr>'}
- return `<p class="mut" style="margin:4px 0 8px">Toca una celda vacía para programar; toca un bloque para editarlo.</p><div class="gw"><table class="g"><thead><tr><th></th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
+ return `<button class="b pri" onclick="pdfParrilla()">Descargar PDF de la parrilla</button><p class="mut" style="margin:8px 0">Toca una celda vacía para programar; toca un bloque para editarlo.</p><div class="gw"><table class="g"><thead><tr><th></th>${DAYS.map(d=>`<th>${d}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function slotDlg(id,d=0,h=0){
  if(!S.programs.length){alert('Primero crea un programa en la pestaña Programas.');return}
@@ -111,7 +112,7 @@ function saveSlot(id){
 function delSlot(id){S.slots=S.slots.filter(x=>x.id!=id);save();dlg.close();render()}
 
 /* PROGRAMAS */
-function vProgs(){return `<button class="b pri" onclick="progDlg()">+ Programa</button>`+(S.programs.map(p=>{
+function vProgs(){return `<button class="b pri" onclick="progDlg()">+ Programa</button> <button class="b" onclick="pdfProgs()">Descargar PDF</button>`+(S.programs.map(p=>{
  const sl=S.slots.filter(s=>s.programId==p.id).sort((a,b)=>a.day-b.day||a.start-b.start);
  return `<div class="card item">${lg(p.logo,p.name)}<div><b>${esc(p.name)}</b><div class="mut">${esc(p.desc)}</div><small>${sl.length?sl.map(s=>`${DAYS[s.day].slice(0,3)} ${pad(s.start)}–${pad(s.end)}h`).join(' · '):'Sin horario asignado'}</small></div><button class="b" onclick="progDlg('${p.id}')">Editar</button></div>`}).join('')||'<p class="mut">Aún no hay programas.</p>')}
 function progDlg(id){const p=id?P(id):{};tmp=p.logo||'';
@@ -125,7 +126,7 @@ function delProg(id){if(!confirm('Se eliminarán también su horario y su regist
  S.programs=S.programs.filter(p=>p.id!=id);S.slots=S.slots.filter(s=>s.programId!=id);S.logs=S.logs.filter(l=>l.programId!=id);save();dlg.close();render()}
 
 /* EQUIPO */
-function vTeam(){return `<button class="b pri" onclick="perDlg()">+ Persona</button>`+(S.people.map(p=>`<div class="card item">${av(p.photo,p.name,56)}<div><b>${esc(p.name)}</b> <span class="badge">${p.role=='locutor'?'Locutor/a':'Operador/a'}</span><div class="mut" style="white-space:pre-wrap">${esc(p.bio)||'Sin biografía'}</div></div><button class="b" onclick="perDlg('${p.id}')">Editar</button></div>`).join('')||'<p class="mut">Agrega locutores y operadores.</p>')}
+function vTeam(){return `<button class="b pri" onclick="perDlg()">+ Persona</button> <button class="b" onclick="pdfTeam()">Descargar PDF</button>`+(S.people.map(p=>`<div class="card item">${av(p.photo,p.name,56)}<div><b>${esc(p.name)}</b> <span class="badge">${p.role=='locutor'?'Locutor/a':'Operador/a'}</span><div class="mut" style="white-space:pre-wrap">${esc(p.bio)||'Sin biografía'}</div></div><button class="b" onclick="perDlg('${p.id}')">Editar</button></div>`).join('')||'<p class="mut">Agrega locutores y operadores.</p>')}
 function perDlg(id){const p=id?H(id):{role:'locutor'};tmp=p.photo||'';
  openDlg(`<h3>${id?'Editar':'Nueva'} persona</h3><label>Nombre<input type="text" id="f_n" value="${esc(p.name)}"></label>
  <label>Rol<select id="f_r"><option value="locutor" ${p.role=='locutor'?'selected':''}>Locutor/a (conductor)</option><option value="operador" ${p.role=='operador'?'selected':''}>Operador/a</option></select></label>
@@ -140,11 +141,11 @@ function delPer(id){if(!confirm('¿Eliminar a esta persona? Se quitará de los b
 
 /* REGISTRO */
 function vLog(){
- const ls=[...S.logs].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,60);
+ const ls=S.logs.filter(l=>l.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
  return `<div class="card"><b>Registrar programa emitido</b>
  <label>Programa<select id="l_p">${S.programs.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
  <div class="row"><label>Fecha<input type="date" id="l_d" value="${today()}"></label><label>Likes<input type="number" id="l_l" min="0" value="0"></label><label>Comentarios en vivo<input type="number" id="l_c" min="0" value="0"></label></div>
- <label>Notas (opcional)<input type="text" id="l_n"></label><div class="row end"><button class="b pri" onclick="addLog()">Guardar emisión</button></div></div>`+
+ <label>Notas (opcional)<input type="text" id="l_n"></label><div class="row end"><button class="b pri" onclick="addLog()">Guardar emisión</button></div></div><div class="row" style="align-items:end"><label>Mes<input type="month" value="${month}" onchange="month=this.value;render()"></label><div style="flex:none"><button class="b" onclick="pdfLog()">Descargar PDF del mes</button></div></div>`+
  (ls.map(l=>{const p=P(l.programId);return `<div class="card item">${lg(p?.logo,p?.name,40)}<div><b>${esc(p?.name)}</b> <small>${l.date}</small><div>👍 ${l.likes} · 💬 ${l.comments}</div>${l.note?`<small>${esc(l.note)}</small>`:''}</div><button class="b dng" onclick="delLog('${l.id}')">✕</button></div>`}).join('')||'<p class="mut">Sin emisiones registradas.</p>')}
 function addLog(){if(!S.programs.length){alert('Primero crea un programa.');return}
  S.logs.push({id:uid(),programId:val('l_p'),date:val('l_d')||today(),likes:+val('l_l')||0,comments:+val('l_c')||0,note:val('l_n')});save();render()}
@@ -155,7 +156,7 @@ const prevM=m=>{let[y,n]=m.split('-').map(Number);n--;if(!n){y--;n=12}return y+'
 function stats(pid,m){const l=S.logs.filter(x=>x.programId==pid&&x.date.startsWith(m)),n=l.length,lk=l.reduce((a,x)=>a+x.likes,0),cm=l.reduce((a,x)=>a+x.comments,0);return{n,lk,cm,avg:n?(lk+cm)/n:0}}
 function vEval(){
  const rows=S.programs.map(p=>({p,c:stats(p.id,month),b:stats(p.id,prevM(month))})).sort((a,b)=>b.c.avg-a.c.avg),mx=Math.max(1,...rows.map(r=>r.c.avg));
- return `<label style="margin-top:0">Mes a evaluar<input type="month" id="m" value="${month}" onchange="month=this.value;render()"></label>`+
+ return `<label style="margin-top:0">Mes a evaluar<input type="month" id="m" value="${month}" onchange="month=this.value;render()"></label><button class="b pri" style="margin-top:10px" onclick="pdfEval()">Descargar PDF de la evaluación</button>`+
  (rows.map((r,i)=>{const d=r.b.avg?((r.c.avg-r.b.avg)/r.b.avg*100):null;
   return `<div class="card"><div class="item">${lg(r.p.logo,r.p.name,40)}<div><b>${i+1}. ${esc(r.p.name)}</b><div class="mut">${r.c.n} emisiones · 👍 ${r.c.lk} · 💬 ${r.c.cm}</div><div>Promedio de interacción por emisión: <b>${r.c.avg.toFixed(1)}</b> ${d===null?'<small>(sin mes anterior)</small>':`<span class="${d>=0?'up':'dn'}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(0)}% vs mes anterior</span>`}</div></div></div><div class="bar"><i style="width:${r.c.avg/mx*100}%"></i></div></div>`}).join('')||'<p class="mut">Crea programas y registra emisiones para evaluar.</p>')}
 
@@ -163,9 +164,101 @@ function vEval(){
 function vStation(){const s=S.station;return `<div class="card"><label style="margin-top:0">Nombre de la emisora<input type="text" value="${esc(s.name)}" onchange="S.station.name=this.value;save();render()"></label>
  <label>Frecuencia / eslogan<input type="text" value="${esc(s.freq)}" onchange="S.station.freq=this.value;save();render()"></label>
  <div class="item" style="margin-top:12px">${lg(s.logo,s.name,64)}<button class="b" onclick="pickImg(d=>{S.station.logo=d;save();render()})">Subir imagen de la estación</button></div></div>
+ <div class="card"><b>Reporte completo en PDF</b><p class="mut">Portada, parrilla, programas, equipo, registro y evaluación del mes elegido.</p><label>Mes<input type="month" value="${month}" onchange="month=this.value"></label><div class="row end"><button class="b pri" onclick="pdfAll()">Descargar PDF completo</button></div></div>
  <div class="card"><b>Respaldo</b><p class="mut">Los datos se guardan en este navegador. Descarga un respaldo para no perderlos o llevarlos a otro equipo.</p>
  <div class="row"><button class="b" onclick="exp()">Descargar respaldo</button><button class="b" onclick="imp()">Restaurar respaldo</button></div></div>`}
-function exp(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='parrilla-fm-respaldo.json';a.click()}
+async function exp(){if(NATIVE()){try{await shareFile('parrilla-fm-respaldo.json',btoa(unescape(encodeURIComponent(JSON.stringify(S)))))}catch(e){if(!/cancel/i.test(e.message||e))alert('No se pudo exportar: '+(e.message||e))}return}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:'application/json'}));a.download='parrilla-fm-respaldo.json';a.click()}
 function imp(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=()=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.programs)throw 0;S=Object.assign(S,d);save();render()}catch(e){alert('Archivo no válido.')}};r.readAsText(i.files[0])};i.click()}
+/* ===== PDF ===== */
+const NATIVE=()=>{const C=window.Capacitor;return !!(C&&C.isNativePlatform&&C.isNativePlatform())};
+let _fs,_sh;
+async function shareFile(name,b64){const C=window.Capacitor;_fs=_fs||C.registerPlugin('Filesystem');_sh=_sh||C.registerPlugin('Share');
+ const r=await _fs.writeFile({path:name,data:b64,directory:'CACHE'});
+ await _sh.share({title:name,url:r.uri,dialogTitle:'Guardar o compartir'})}
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTxt=m=>{const[y,n]=m.split('-');return MESES[n-1]+' de '+y};
+function rgbOf(id){let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;const s=.5,l=.38,a=s*Math.min(l,1-l),f=n=>{const k=(n+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))))};return[f(0),f(8),f(4)]}
+function mk(land){if(!window.jspdf){alert('El generador de PDF aún no está listo. Revisa la conexión y vuelve a intentar.');return null}
+ const d=new window.jspdf.jsPDF({orientation:land?'l':'p',unit:'pt',format:'a4'});d.fresh=true;return d}
+const PW=d=>d.internal.pageSize.getWidth(),PH=d=>d.internal.pageSize.getHeight();
+function img(d,src,x,y,w,h){if(!src)return;try{d.addImage(src,'JPEG',x,y,w,h)}catch(e){}}
+function head(d,title){const w=PW(d),tx=S.station.logo?84:36;img(d,S.station.logo,36,22,40,40);
+ d.setTextColor(30);d.setFont('helvetica','bold');d.setFontSize(15);d.text(S.station.name||'Emisora',tx,40);
+ d.setFont('helvetica','normal');d.setFontSize(10);d.setTextColor(90);d.text(title,tx,56);d.text('Generado: '+today(),w-36,40,{align:'right'});
+ d.setDrawColor(212,56,13);d.setLineWidth(1.5);d.line(36,70,w-36,70);return 90}
+function page(d,title,land){if(d.fresh)d.fresh=false;else d.addPage('a4',land?'l':'p');d.curTitle=title;d.curLand=land;return head(d,title)}
+function need(d,y,h){if(y+h<=PH(d)-40)return y;d.addPage('a4',d.curLand?'l':'p');return head(d,d.curTitle+' (cont.)')}
+const hostsTxt=s=>(s.hosts||[]).map(i=>H(i)?.name).filter(Boolean).join(', ');
+function txt(d,t,x,y,o={}){d.setFont('helvetica',o.b?'bold':'normal');d.setFontSize(o.s||9);const c=o.c||[40,40,40];d.setTextColor(...c);d.text(t,x,y,o.a?{align:o.a}:undefined)}
+
+function secCover(d){let y=page(d,'Reporte de gestión - '+mesTxt(month),false);
+ img(d,S.station.logo,36,y+10,110,110);txt(d,S.station.name||'Emisora',160,y+50,{b:1,s:26});txt(d,S.station.freq||'',160,y+72,{s:13,c:[90,90,90]});
+ const hrs=S.slots.reduce((a,s)=>a+s.end-s.start,0),em=S.logs.filter(l=>l.date.startsWith(month));
+ y+=160;[['Programas',S.programs.length],['Personas en el equipo',S.people.length],['Horas programadas por semana',hrs],['Emisiones registradas en el mes',em.length],['Likes del mes',em.reduce((a,l)=>a+l.likes,0)],['Comentarios del mes',em.reduce((a,l)=>a+l.comments,0)]].forEach(([k,v])=>{txt(d,k,60,y,{s:12});txt(d,String(v),380,y,{b:1,s:12,a:'right'});d.setDrawColor(225);d.setLineWidth(.5);d.line(60,y+6,380,y+6);y+=26})}
+
+function secParrilla(d){let y=page(d,'Parrilla semanal',true);
+ const w=PW(d),x0=36,hw=34,cw=(w-72-hw)/7,rh=(PH(d)-30-y-16)/24,gy=y+16;
+ DAYS.forEach((n,i)=>txt(d,n,x0+hw+cw*i+cw/2,y+10,{b:1,s:8,a:'center',c:[60,60,60]}));
+ d.setDrawColor(200);d.setLineWidth(.4);
+ for(let h=0;h<24;h++){txt(d,pad(h)+':00',x0+hw-4,gy+h*rh+rh/2+2,{s:6.5,a:'right',c:[110,110,110]});for(let k=0;k<7;k++)d.rect(x0+hw+k*cw,gy+h*rh,cw,rh)}
+ S.slots.forEach(s=>{const p=P(s.programId),x=x0+hw+s.day*cw,yy=gy+s.start*rh,hh=(s.end-s.start)*rh,hs=hostsTxt(s),op=H(s.operator)?.name;
+  d.setFillColor(...rgbOf(s.programId));d.setDrawColor(255);d.rect(x,yy,cw,hh,'FD');
+  d.setFont('helvetica','bold');d.setFontSize(6.5);let L=d.splitTextToSize(p?.name||'?',cw-6).map(t=>[t,1]);
+  d.setFont('helvetica','normal');if(hs)L=L.concat(d.splitTextToSize('Loc: '+hs,cw-6).map(t=>[t,0]));if(op)L=L.concat(d.splitTextToSize('Op: '+op,cw-6).map(t=>[t,0]));
+  d.setTextColor(255,255,255);L.slice(0,Math.max(1,Math.floor((hh-3)/7.2))).forEach(([t,b],i)=>{d.setFont('helvetica',b?'bold':'normal');d.setFontSize(6.5);d.text(t,x+3,yy+8+i*7.2)})});
+ y=page(d,'Detalle de la parrilla',false);
+ DAYS.forEach((n,i)=>{const sl=S.slots.filter(s=>s.day==i).sort((a,b)=>a.start-b.start);
+  y=need(d,y,30);txt(d,n,36,y,{b:1,s:11,c:[212,56,13]});y+=14;
+  if(!sl.length){txt(d,'Sin programación',46,y,{c:[130,130,130]});y+=18;return}
+  sl.forEach(s=>{const p=P(s.programId),op=H(s.operator)?.name,ls=d.splitTextToSize(`${pad(s.start)}:00 - ${pad(s.end)}:00   ${p?.name||'?'}   |   Locutores: ${hostsTxt(s)||'-'}   |   Operador: ${op||'-'}`,PW(d)-90);
+   y=need(d,y,ls.length*11+4);txt(d,ls,46,y);y+=ls.length*11+3});y+=8})}
+
+function secProgs(d){let y=page(d,'Programas',false);
+ if(!S.programs.length){txt(d,'Sin programas.',36,y);return}
+ S.programs.forEach(p=>{const sl=S.slots.filter(s=>s.programId==p.id).sort((a,b)=>a.day-b.day||a.start-b.start),
+  hor=sl.length?sl.map(s=>`${DAYS[s.day].slice(0,3)} ${pad(s.start)}-${pad(s.end)}h`).join('   ·   '):'Sin horario asignado';
+  d.setFont('helvetica','normal');d.setFontSize(9);const bw=PW(d)-172,dl=d.splitTextToSize(p.desc||'',bw),hl=d.splitTextToSize(hor,bw),h=Math.max(62,30+dl.length*11+hl.length*11);
+  y=need(d,y,h);img(d,p.logo,36,y,52,52);txt(d,p.name,100,y+12,{b:1,s:12,c:[30,30,30]});txt(d,dl,100,y+26,{c:[80,80,80]});txt(d,hl,100,y+28+dl.length*11,{c:[212,56,13]});
+  y+=h;d.setDrawColor(225);d.line(36,y-6,PW(d)-36,y-6)})}
+
+function secTeam(d){let y=page(d,'Equipo: locutores y operadores',false);
+ if(!S.people.length){txt(d,'Sin personas registradas.',36,y);return}
+ S.people.forEach(p=>{d.setFont('helvetica','normal');d.setFontSize(9);const bl=d.splitTextToSize(p.bio||'Sin biografía',PW(d)-172),h=Math.max(66,34+bl.length*11);
+  y=need(d,y,h);img(d,p.photo,36,y,56,56);txt(d,p.name,104,y+12,{b:1,s:12,c:[30,30,30]});txt(d,p.role=='locutor'?'Locutor/a':'Operador/a',104,y+25,{c:[212,56,13]});txt(d,bl,104,y+39,{c:[80,80,80]});
+  y+=h;d.setDrawColor(225);d.line(36,y-6,PW(d)-36,y-6)})}
+
+function secLog(d){let y=page(d,'Registro de emisiones - '+mesTxt(month),false);
+ const ls=S.logs.filter(l=>l.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date)),R=PW(d)-36;
+ const th=()=>{d.setFillColor(238,238,238);d.rect(36,y-11,R-36,16,'F');txt(d,'Fecha',40,y,{b:1});txt(d,'Programa',110,y,{b:1});txt(d,'Likes',350,y,{b:1,a:'right'});txt(d,'Comentarios',425,y,{b:1,a:'right'});txt(d,'Notas',440,y,{b:1});y+=16};
+ if(!ls.length){txt(d,'Sin emisiones registradas en este mes.',36,y);return}
+ th();
+ ls.forEach(l=>{d.setFont('helvetica','normal');d.setFontSize(9);const nl=d.splitTextToSize(l.note||'',R-440),r=Math.max(14,nl.length*11+3),y2=need(d,y,r);if(y2!==y){y=y2;th()}
+  txt(d,l.date,40,y);txt(d,d.splitTextToSize(P(l.programId)?.name||'?',230)[0],110,y);txt(d,String(l.likes),350,y,{a:'right'});txt(d,String(l.comments),425,y,{a:'right'});txt(d,nl,440,y,{c:[90,90,90]});y+=r});
+ y=need(d,y,24)+6;txt(d,'TOTAL: '+ls.length+' emisiones',40,y,{b:1});txt(d,String(ls.reduce((a,l)=>a+l.likes,0)),350,y,{b:1,a:'right'});txt(d,String(ls.reduce((a,l)=>a+l.comments,0)),425,y,{b:1,a:'right'})}
+
+function secEval(d){let y=page(d,'Evaluación mensual - '+mesTxt(month),false);
+ const rows=S.programs.map(p=>({p,c:stats(p.id,month),b:stats(p.id,prevM(month))})).sort((a,b)=>b.c.avg-a.c.avg),mx=Math.max(1,...rows.map(r=>r.c.avg)),R=PW(d)-36;
+ if(!rows.length){txt(d,'Sin programas.',36,y);return}
+ const th=()=>{d.setFillColor(238,238,238);d.rect(36,y-11,R-36,16,'F');txt(d,'#',40,y,{b:1});txt(d,'Programa',58,y,{b:1});txt(d,'Emisiones',300,y,{b:1,a:'right'});txt(d,'Likes',350,y,{b:1,a:'right'});txt(d,'Coment.',405,y,{b:1,a:'right'});txt(d,'Prom.',455,y,{b:1,a:'right'});txt(d,'vs mes ant.',R-4,y,{b:1,a:'right'});y+=18};
+ th();
+ rows.forEach((r,i)=>{const y2=need(d,y,30);if(y2!==y){y=y2;th()}
+  const dl=r.b.avg?((r.c.avg-r.b.avg)/r.b.avg*100):null;
+  txt(d,String(i+1),40,y);txt(d,d.splitTextToSize(r.p.name,200)[0],58,y,{b:1});txt(d,String(r.c.n),300,y,{a:'right'});txt(d,String(r.c.lk),350,y,{a:'right'});txt(d,String(r.c.cm),405,y,{a:'right'});txt(d,r.c.avg.toFixed(1),455,y,{b:1,a:'right'});
+  txt(d,dl===null?'sin dato':(dl>=0?'+':'-')+Math.abs(dl).toFixed(0)+'%',R-4,y,{a:'right',b:1,c:dl===null?[130,130,130]:dl>=0?[46,157,87]:[192,57,43]});
+  d.setFillColor(225,225,225);d.rect(58,y+5,200,4,'F');d.setFillColor(212,56,13);d.rect(58,y+5,200*r.c.avg/mx,4,'F');y+=26});
+ const top=rows.find(r=>r.c.n>0);y=need(d,y,30)+8;
+ txt(d,top?`Mayor interacción del mes: ${top.p.name} (promedio ${top.c.avg.toFixed(1)} por emisión).`:'No hay emisiones registradas en este mes.',40,y,{b:1,s:10});
+ txt(d,'Promedio = (likes + comentarios) / emisiones. La variación compara con el promedio del mes anterior.',40,y+16,{s:8,c:[110,110,110]})}
+
+async function outPDF(d,name){
+ const n=d.internal.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);txt(d,`${S.station.name} - Página ${i} de ${n}`,PW(d)/2,PH(d)-16,{s:8,a:'center',c:[130,130,130]})}
+ try{if(NATIVE())await shareFile(name,d.output('datauristring').split(',')[1]);else d.save(name)}
+ catch(e){if(!/cancel/i.test(e.message||String(e)))alert('No se pudo exportar el PDF: '+(e.message||e))}}
+async function pdfParrilla(){const d=mk(true);if(!d)return;secParrilla(d);await outPDF(d,'parrilla-semanal.pdf')}
+async function pdfProgs(){const d=mk(false);if(!d)return;secProgs(d);await outPDF(d,'programas.pdf')}
+async function pdfTeam(){const d=mk(false);if(!d)return;secTeam(d);await outPDF(d,'equipo.pdf')}
+async function pdfLog(){const d=mk(false);if(!d)return;secLog(d);await outPDF(d,'registro-'+month+'.pdf')}
+async function pdfEval(){const d=mk(false);if(!d)return;secEval(d);await outPDF(d,'evaluacion-'+month+'.pdf')}
+async function pdfAll(){const d=mk(false);if(!d)return;secCover(d);secParrilla(d);secProgs(d);secTeam(d);secLog(d);secEval(d);await outPDF(d,'reporte-'+month+'.pdf')}
 render();
 </script></body></html>
